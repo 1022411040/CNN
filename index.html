@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Image Classifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .card h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            color: #667eea;
+        }
+        
+        /* Add Class Form */
+        .add-class-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .add-class-form input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .add-class-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #0da271;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+        
+        /* Class List */
+        .class-list {
+            list-style: none;
+        }
+        
+        .class-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .class-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .class-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Upload Area */
+        .upload-area {
+            border: 3px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8faff;
+        }
+        
+        .upload-area i {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .upload-area p {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area .file-name {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        /* Results */
+        .results {
+            display: none;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .confidence-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: #667eea;
+            border-radius: 4px;
+            transition: width 1s ease-out;
+        }
+        
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        /* Status */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background: #10b981;
+        }
+        
+        .status-offline {
+            background: #ef4444;
+        }
+        
+        /* Alert */
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            justify-content: center;
+        }
+        
+        .statistics {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            min-width: 150px;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-robot"></i> Dynamic Image Classifier</h1>
+            <p class="subtitle">Add classes, train models, and classify images in real-time</p>
+        </header>
+        
+        <!-- Status Alert -->
+        <div id="alert" class="alert"></div>
+        
+        <div class="dashboard">
+            <!-- Left Column: Class Management -->
+            <div class="card">
+                <h2><i class="fas fa-layer-group"></i> Class Management</h2>
+                
+                <!-- Add Class Form -->
+                <div class="add-class-form">
+                    <input type="text" id="className" placeholder="Enter class name (e.g., 'cat', 'dog', 'car')">
+                    <button onclick="addClass()" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Class
+                    </button>
+                </div>
+                
+                <!-- Class List -->
+                <h3>Current Classes</h3>
+                <ul id="classList" class="class-list">
+                    <!-- Classes will be loaded here -->
+                </ul>
+                
+                <!-- Train Button -->
+                <div style="text-align: center; margin-top: 25px;">
+                    <button onclick="trainModel()" class="btn btn-success" style="width: 100%;">
+                        <i class="fas fa-brain"></i> Train New Model
+                    </button>
+                    <small style="color: #666; display: block; margin-top: 10px;">
+                        Requires at least 2 classes with sufficient images
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Right Column: Image Classification -->
+            <div class="card">
+                <h2><i class="fas fa-camera"></i> Image Classification</h2>
+                
+                <!-- Upload Area -->
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Click to upload an image or drag and drop</p>
+                    <p>Supported formats: JPG, PNG</p>
+                    <p class="file-name" id="fileName">No file selected</p>
+                </div>
+                <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                
+                <!-- Classification Results -->
+                <div id="results" class="results">
+                    <h3>Predictions</h3>
+                    <div id="predictions">
+                        <!-- Predictions will appear here -->
+                    </div>
+                </div>
+                
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Processing image...</p>
+                </div>
+                
+                <!-- Predict Button -->
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="predictImage()" class="btn btn-primary" id="predictBtn" disabled>
+                        <i class="fas fa-magic"></i> Classify Image
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="card" style="margin-bottom: 30px;">
+            <h2><i class="fas fa-chart-line"></i> System Status</h2>
+            <div class="statistics">
+                <div class="stat-box">
+                    <div class="stat-number" id="classCount">0</div>
+                    <div class="stat-label">Classes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="modelStatus">No</div>
+                    <div class="stat-label">Model Loaded</div>
+                </div>
+                <div class="stat-box">
+                    <div id="apiStatus" class="status-indicator status-offline"></div>
+                    <div class="stat-number">API</div>
+                    <div class="stat-label">Connection</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Controls -->
+        <div class="controls">
+            <button onclick="loadClasses()" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Refresh Classes
+            </button>
+            <button onclick="checkModelStatus()" class="btn btn-primary">
+                <i class="fas fa-search"></i> Check Model
+            </button>
+            <button onclick="reloadModel()" class="btn btn-primary">
+                <i class="fas fa-redo"></i> Reload Model
+            </button>
+            <button onclick="clearResults()" class="btn btn-danger">
+                <i class="fas fa-trash"></i> Clear Results
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        let selectedFile = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadClasses();
+            checkAPIStatus();
+            checkModelStatus();
+        });
+        
+        // Check API connection
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    document.getElementById('apiStatus').className = 'status-indicator status-online';
+                    showAlert('API connection successful!', 'success');
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').className = 'status-indicator status-offline';
+                showAlert('Cannot connect to API. Make sure the server is running.', 'error');
+            }
+        }
+        
+        // Add a new class
+        async function addClass() {
+            const className = document.getElementById('className').value.trim();
+            
+            if (!className) {
+                showAlert('Please enter a class name', 'error');
+                return;
+            }
+            
+            try {
+                showLoading('Adding class and starting image crawl...');
+                
+                const response = await fetch(`${API_BASE_URL}/classes/add?class_name=${encodeURIComponent(className)}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Class '${className}' added successfully! ${data.message}`, 'success');
+                    document.getElementById('className').value = '';
+                    loadClasses();
+                    
+                    // Auto-check model status after adding class
+                    setTimeout(checkModelStatus, 1000);
+                } else {
+                    showAlert(data.detail || 'Failed to add class', 'error');
+                }
+            } catch (error) {
+                showAlert('Error connecting to server', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // Load all classes
+        async function loadClasses() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/classes`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const classList = document.getElementById('classList');
+                    classList.innerHTML = '';
+                    
+                    data.classes.forEach(cls => {
+                        const li = document.createElement('li');
+                        li.className = 'class-item';
+                        li.innerHTML = `
+                            <div class="class-info">
+                                <span>${cls.name}</span>
+                                <span class="class-badge">${cls.image_count} images</span>
+                            </div>
+                            <div>
+                                <span style="color: #666; font-size: 0.9em;">ID: ${cls.id}</span>
+                            </div>
+                        `;
+                        classList.appendChild(li);
+                    });
+                    
+                    document.getElementById('classCount').textContent = data.total;
+                    
+                    if (data.total === 0) {
+                        classList.innerHTML = '<li style="text-align: center; color: #666; padding: 20px;">No classes added yet</li>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading classes:', error);
+            }
+        }
+        
+        // Train model
+        async function trainModel() {
+            try {
+                showLoading('Starting model training... This may take a few minutes.');
+                
+                const response = await fetch(`${API_BASE_URL}/train`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Training started! ${data.message}`, 'success');
+                    
+                    // Poll for training completion
+                    pollTrainingStatus();
+                } else {
+                    showAlert(data.detail || 'Training failed to start', 'error');
+                    hideLoading();
+                }
+            } catch (error) {
+                showAlert('Error starting training', 'error');
+                hideLoading();
+            }
+        }
+        
+        // Poll training status
+        async function pollTrainingStatus() {
+            const checkInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/models/status`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'loaded') {
+                        clearInterval(checkInterval);
+                        hideLoading();
+                        showAlert('Model training completed and loaded!', 'success');
+                        checkModelStatus();
+                    }
+                } catch (error) {
+                    // Continue polling
+                }
+            }, 5000); // Check every 5 seconds
+        }
+        
+        // Handle file selection
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            
+            if (selectedFile) {
+                document.getElementById('fileName').textContent = selectedFile.name;
+                document.getElementById('uploadArea').style.borderColor = '#667eea';
+                document.getElementById('predictBtn').disabled = false;
+                
+                // Preview image
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // You could add image preview here if needed
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        }
+        
+        // Predict image
+        async function predictImage() {
+            if (!selectedFile) {
+                showAlert('Please select an image first', 'error');
+                return;
+            }
+            
+            // Check if model is loaded
+            const statusResponse = await fetch(`${API_BASE_URL}/models/status`);
+            const statusData = await statusResponse.json();
+            
+            if (statusData.status !== 'loaded') {
+                showAlert('Model is not loaded. Please train a model first.', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                showLoading('Classifying image...');
+                
+                const response = await fetch(`${API_BASE_URL}/predict?top_k=5`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayPredictions(data);
+                } else {
+                    showAlert(data.detail || 'Prediction failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error during prediction', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // Display predictions
+        function displayPredictions(data) {
+            const resultsDiv = document.getElementById('results');
+            const predictionsDiv = document.getElementById('predictions');
+            
+            resultsDiv.style.display = 'block';
+            predictionsDiv.innerHTML = '';
+            
+            data.predictions.forEach((pred, index) => {
+                const confidencePercent = (pred.confidence * 100).toFixed(1);
+                const delay = index * 100;
+                
+                const predDiv = document.createElement('div');
+                predDiv.className = 'result-item';
+                predDiv.style.animationDelay = `${delay}ms`;
+                predDiv.innerHTML = `
+                    <div>
+                        <strong>${pred.class}</strong>
+                        <div>Class ID: ${pred.class_id}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #667eea;">
+                            ${confidencePercent}%
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidencePercent}%"></div>
+                        </div>
+                    </div>
+                `;
+                predictionsDiv.appendChild(predDiv);
+            });
+            
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Check model status
+        async function checkModelStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/models/status`);
+                const data = await response.json();
+                
+                if (data.status === 'loaded') {
+                    document.getElementById('modelStatus').textContent = 'Yes';
+                    document.getElementById('modelStatus').style.color = '#10b981';
+                } else {
+                    document.getElementById('modelStatus').textContent = 'No';
+                    document.getElementById('modelStatus').style.color = '#ef4444';
+                }
+            } catch (error) {
+                document.getElementById('modelStatus').textContent = 'Error';
+                document.getElementById('modelStatus').style.color = '#ef4444';
+            }
+        }
+        
+        // Reload model
+        async function reloadModel() {
+            try {
+                showLoading('Reloading model...');
+                
+                const response = await fetch(`${API_BASE_URL}/reload`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Model reloaded successfully!', 'success');
+                    checkModelStatus();
+                } else {
+                    showAlert(data.detail || 'Failed to reload model', 'error');
+                }
+            } catch (error) {
+                showAlert('Error reloading model', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // Clear results
+        function clearResults() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('predictions').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileName').textContent = 'No file selected';
+            document.getElementById('uploadArea').style.borderColor = '#dee2e6';
+            document.getElementById('predictBtn').disabled = true;
+            selectedFile = null;
+        }
+        
+        // Show alert
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alert');
+            alertDiv.textContent = message;
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Show loading
+        function showLoading(message = 'Loading...') {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loadingText').textContent = message;
+        }
+        
+        // Hide loading
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Drag and drop support
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#667eea';
+                this.style.backgroundColor = '#f8faff';
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#dee2e6';
+                this.style.backgroundColor = '';
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#667eea';
+                this.style.backgroundColor = '';
+                
+                if (e.dataTransfer.files.length) {
+                    selectedFile = e.dataTransfer.files[0];
+                    document.getElementById('fileName').textContent = selectedFile.name;
+                    document.getElementById('predictBtn').disabled = false;
+                    
+                    // Trigger file input change
+                    const fileInput = document.getElementById('fileInput');
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(selectedFile);
+                    fileInput.files = dataTransfer.files;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "classes": {
+    "apple": {
+      "total": 468,
+      "train": 327,
+      "val": 70,
+      "test": 71
+    },
+    "ball": {
+      "total": 467,
+      "train": 326,
+      "val": 70,
+      "test": 71
+    }
+  }
+}
