@@ -1,0 +1,19 @@
+{
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "classes": {
+    "cat": {
+      "total": 463,
+      "train": 324,
+      "val": 69,
+      "test": 70
+    },
+    "dog": {
+      "total": 469,
+      "train": 328,
+      "val": 70,
+      "test": 71
+    }
+  }
+}

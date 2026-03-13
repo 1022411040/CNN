@@ -21,7 +21,6 @@ from image_crawler import ImageCrawler
 from dataset_manager import DatasetManager
 from trainer import train_new_model
 from fastapi.middleware.cors import CORSMiddleware
-from neuron_monitor import NeuronMonitor
 
 
 # Global components
