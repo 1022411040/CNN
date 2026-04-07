@@ -1,13 +1,13 @@
 {
-  "v2_20260206_103427": {
-    "version": "v2_20260206_103427",
-    "created_at": "2026-02-06 10:34:27.979650",
+  "v2_20260407_141624": {
+    "version": "v2_20260407_141624",
+    "created_at": "2026-04-07 14:16:24.769157",
     "class_count": 2,
-    "total_images": 932,
+    "total_images": 844,
     "class_distribution": {
-      "cat": 463,
-      "dog": 469
+      "cat": 389,
+      "dog": 455
     },
-    "path": "data\\datasets\\v2_20260206_103427"
+    "path": "data\\datasets\\v2_20260407_141624"
   }
 }
