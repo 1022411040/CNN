@@ -1,0 +1,55 @@
+{
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "classes": {
+    "BA- cellulitis": {
+      "total": 124,
+      "train": 86,
+      "val": 18,
+      "test": 20
+    },
+    "BA-impetigo": {
+      "total": 72,
+      "train": 50,
+      "val": 10,
+      "test": 12
+    },
+    "FU-athlete-foot": {
+      "total": 98,
+      "train": 68,
+      "val": 14,
+      "test": 16
+    },
+    "FU-nail-fungus": {
+      "total": 129,
+      "train": 90,
+      "val": 19,
+      "test": 20
+    },
+    "FU-ringworm": {
+      "total": 72,
+      "train": 50,
+      "val": 10,
+      "test": 12
+    },
+    "PA-cutaneous-larva-migrans": {
+      "total": 89,
+      "train": 62,
+      "val": 13,
+      "test": 14
+    },
+    "VI-chickenpox": {
+      "total": 119,
+      "train": 83,
+      "val": 17,
+      "test": 19
+    },
+    "VI-shingles": {
+      "total": 116,
+      "train": 81,
+      "val": 17,
+      "test": 18
+    }
+  }
+}

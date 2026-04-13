@@ -121,3 +121,6 @@ class ModelManager:
             if model_info[2] != current_hash:  # class_list_hash
                 return await self.load_latest_model(registry)
         return False
+    
+    async def force_reload(self, registry):
+        return await self.load_latest_model(registry)

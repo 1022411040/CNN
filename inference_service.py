@@ -4,64 +4,65 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 import io
-from typing import List, Dict
-import asyncio
-from contextlib import asynccontextmanager
+from typing import List
 from torchvision import transforms
 import uvicorn
 from pathlib import Path
-import json
+import zipfile
+import os
+import shutil
 from datetime import datetime
 
-
-# Import our components
+# ✅ KEEP THESE
 from class_registry import ClassRegistry
-from dynamic_model import ModelManager, DynamicEfficientNet
-from image_crawler import ImageCrawler
+from dynamic_model import ModelManager
 from dataset_manager import DatasetManager
 from trainer import train_new_model
+
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
+# ❌ REMOVED: ImageCrawler
 
-# Global components
+# =========================
+# GLOBALS
+# =========================
 registry = None
 model_manager = None
-crawler = None
 dataset_manager = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    global registry, model_manager, crawler, dataset_manager
-    
+    global registry, model_manager, dataset_manager
+
     registry = ClassRegistry()
     model_manager = ModelManager()
-    crawler = ImageCrawler()
     dataset_manager = DatasetManager()
-    
-    # Load latest model
+
+    # Load latest model if exists
     await model_manager.load_latest_model(registry)
-    
+
     yield
-    
-    # Shutdown
-    pass
+
 
 app = FastAPI(
-    title="Dynamic Image Classification API",
-    version="2.0",
+    title="Dynamic Image Classification API (LOCAL ONLY)",
+    version="3.0",
     lifespan=lifespan
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for development only
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Transform for inference
+# =========================
+# TRANSFORM
+# =========================
 transform = transforms.Compose([
     transforms.Resize(380),
     transforms.CenterCrop(380),
@@ -72,104 +73,135 @@ transform = transforms.Compose([
     )
 ])
 
+# =========================
+# CLASSES
+# =========================
 @app.get("/classes")
 async def get_classes():
-    """Get all available classes"""
-    classes = await registry.get_all_classes()
-    return {
-        "classes": [{"id": c.id, "name": c.name, "image_count": c.image_count} for c in classes],
-        "total": len(classes)
-    }
+    dataset_dir = Path("skin-disease-datasaet/train_set")
+    classes = []
+
+    if dataset_dir.exists():
+        for d in dataset_dir.iterdir():
+            if d.is_dir() and not d.name.startswith("v"):
+                count = len(list(d.glob("*.*")))
+                classes.append({
+                    "name": d.name,
+                    "image_count": count
+                })
+
+    return {"classes": classes, "total": len(classes)}
+
 
 @app.post("/classes/add")
-async def add_class(class_name: str, background_tasks: BackgroundTasks):
-    """Add a new class to the system"""
+async def add_class(class_name: str):
+    """LOCAL ONLY - no crawling"""
     class_id = await registry.add_class(class_name)
-    
-    # Start background crawling for this class
-    background_tasks.add_task(
-        crawler.crawl_class,
-        class_name=class_name,
-        max_images=500
-    )
-    
+
+    dataset_dir = Path("skin-disease-datasaet/train_set") / class_name
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+
     return {
-        "message": f"Class '{class_name}' added successfully",
-        "class_id": class_id,
-        "crawling_started": True
+        "message": f"Class '{class_name}' created locally",
+        "class_id": class_id
     }
 
-@app.post("/predict")
-async def predict(
-    file: UploadFile = File(...),
-    top_k: int = 5
+
+# =========================
+# DATASET UPLOAD (KEEPED)
+# =========================
+@app.post("/upload-dataset")
+async def upload_dataset(
+    class_name: str = None,
+    files: List[UploadFile] = File(...)
 ):
-    """Make prediction on uploaded image"""
-    if model_manager.active_model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    
-    # Read and process image
-    image_bytes = await file.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-    
-    # Apply transforms
-    tensor = transform(image).unsqueeze(0)
-    
-    # Move to device
-    device = next(model_manager.active_model.parameters()).device
-    tensor = tensor.to(device)
-    
-    # Inference
-    with torch.no_grad():
-        if device.type == 'cuda':
-            with torch.cuda.amp.autocast():
-                outputs = model_manager.active_model(tensor)
+    saved = 0
+    base_dir = Path("data/datasets")
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    for file in files:
+        contents = await file.read()
+
+        if file.filename.endswith(".zip"):
+            temp_dir = base_dir / "temp_extract"
+            temp_dir.mkdir(exist_ok=True)
+
+            zip_path = temp_dir / file.filename
+            with open(zip_path, "wb") as f:
+                f.write(contents)
+
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+
+            os.remove(zip_path)
+
+            for root, _, file_list in os.walk(temp_dir):
+                for file_name in file_list:
+                    if file_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                        src = Path(root) / file_name
+
+                        if "_" in file_name:
+                            class_folder = file_name.split("_")[0].lower()
+                        else:
+                            class_folder = Path(root).name.lower()
+
+                        await registry.add_class(class_folder)
+
+                        dest_dir = base_dir / class_folder
+                        dest_dir.mkdir(parents=True, exist_ok=True)
+
+                        shutil.copy2(src, dest_dir / file_name)
+                        saved += 1
+
+            shutil.rmtree(temp_dir)
+
         else:
-            outputs = model_manager.active_model(tensor)
-        
-        probs = F.softmax(outputs, dim=1)
-        top_probs, top_indices = torch.topk(probs, min(top_k, len(model_manager.class_names)))
-    
-    # Prepare response
-    predictions = []
-    for prob, idx in zip(top_probs[0], top_indices[0]):
-        predictions.append({
-            "class": model_manager.class_names[idx.item()],
-            "confidence": round(prob.item(), 4),
-            "class_id": idx.item() + 1
-        })
-    
+            filename = Path(file.filename).name
+
+            if "_" in filename:
+                class_folder = filename.split("_")[0].lower()
+            elif class_name:
+                class_folder = class_name.lower()
+            else:
+                class_folder = "unknown"
+
+            await registry.add_class(class_folder)
+
+            dest_dir = base_dir / class_folder
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            with open(dest_dir / filename, "wb") as f:
+                f.write(contents)
+
+            saved += 1
+
     return {
-        "predictions": predictions,
-        "top_class": predictions[0]["class"],
-        "top_confidence": predictions[0]["confidence"],
-        "model_version": "dynamic",
-        "total_classes": len(model_manager.class_names)
+        "message": f"{saved} images uploaded (local)",
+        "status": "success"
     }
 
+
+# =========================
+# TRAIN
+# =========================
 @app.post("/train")
 async def train_model(background_tasks: BackgroundTasks):
-    classes = await registry.get_class_names()
-    if len(classes) < 2:
-        raise HTTPException(
-            status_code=400,
-            detail="Need at least 2 classes to train"
-        )
+    dataset_dir = Path("skin-disease-datasaet/train_set")
 
-    # 🔒 BLOCK TRAINING IF CRAWLING STILL RUNNING
-    if crawler.active_crawls:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Crawling still running for: {list(crawler.active_crawls)}"
-        )
+    classes = [
+        d.name for d in dataset_dir.iterdir()
+        if d.is_dir() and not d.name.startswith("v")
+    ]
+
+    if len(classes) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 classes")
 
     version_name = f"v{len(classes)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    source_dir = Path("data/datasets")
 
     await dataset_manager.create_version(
         version_name=version_name,
         classes=classes,
-        source_dirs=[source_dir]
+        source_dirs=[dataset_dir]
     )
 
     background_tasks.add_task(
@@ -179,48 +211,71 @@ async def train_model(background_tasks: BackgroundTasks):
         model_manager=model_manager
     )
 
+    background_tasks.add_task(model_manager.load_latest_model, registry)
+
     return {
-        "message": "Training started",
+        "message": "Training started (LOCAL DATASET)",
         "dataset_version": version_name
     }
 
+
+# =========================
+# PREDICT
+# =========================
+@app.post("/predict")
+async def predict(file: UploadFile = File(...), top_k: int = 5):
+    if model_manager.active_model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    dataset_dir = Path("skin-disease-datasaet/train_set")
+    current_classes = sorted([d.name for d in dataset_dir.iterdir() if d.is_dir()])
+
+    # ✅ FIX: no crash
+    if set(current_classes) != set(model_manager.class_names):
+        return {
+            "warning": "Model outdated. Retrain required.",
+            "current_classes": current_classes
+        }
+
+    image_bytes = await file.read()
+    image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+
+    tensor = transform(image).unsqueeze(0)
+    device = next(model_manager.active_model.parameters()).device
+    tensor = tensor.to(device)
+
+    with torch.no_grad():
+        outputs = model_manager.active_model(tensor)
+        probs = F.softmax(outputs, dim=1)
+        top_probs, top_indices = torch.topk(probs, min(top_k, len(model_manager.class_names)))
+
+    predictions = []
+    for prob, idx in zip(top_probs[0], top_indices[0]):
+        predictions.append({
+            "class": model_manager.class_names[idx.item()],
+            "confidence": round(prob.item(), 4)
+        })
+
+    return {"predictions": predictions}
+
+
 @app.get("/models/status")
 async def get_model_status():
-    """Get current model status"""
     if model_manager.active_model:
         return {
             "status": "loaded",
             "class_count": len(model_manager.class_names),
-            "device": str(next(model_manager.active_model.parameters()).device),
-            "classes": model_manager.class_names
         }
-    else:
-        return {"status": "not_loaded"}
+    return {"status": "not_loaded"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.post("/reload")
 async def reload_model():
-    """Force reload of latest model"""
-    success = await model_manager.load_latest_model(registry)
-    if success:
+    ok = await model_manager.load_latest_model(registry)
+    if ok:
         return {"message": "Model reloaded successfully"}
-    else:
-        raise HTTPException(status_code=404, detail="No trained model found")
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "model_loaded": model_manager.active_model is not None,
-        "class_count": len(model_manager.class_names) if model_manager.class_names else 0,
-        "timestamp": datetime.now().isoformat()
-    }
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "inference_service:app",
-        host="127.0.0.1",
-        port=8000,
-        workers=1,
-        reload=False
-    )
+    return {"message": "No model found"}
