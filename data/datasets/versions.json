@@ -32,5 +32,22 @@
       "VI-shingles": 116
     },
     "path": "data\\datasets\\v8_20260413_104332"
+  },
+  "v8_20260413_121255": {
+    "version": "v8_20260413_121255",
+    "created_at": "2026-04-13 12:12:56.692618",
+    "class_count": 8,
+    "total_images": 819,
+    "class_distribution": {
+      "BA- cellulitis": 124,
+      "BA-impetigo": 72,
+      "FU-athlete-foot": 98,
+      "FU-nail-fungus": 129,
+      "FU-ringworm": 72,
+      "PA-cutaneous-larva-migrans": 89,
+      "VI-chickenpox": 119,
+      "VI-shingles": 116
+    },
+    "path": "data\\datasets\\v8_20260413_121255"
   }
 }

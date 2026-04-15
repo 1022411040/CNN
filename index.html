@@ -7,6 +7,7 @@
     <!-- Google Fonts: Material Icons + Google Sans Text (Inter fallback) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,1" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -435,6 +436,154 @@
             body { padding: 16px; }
             .stats-row { flex-direction: column; }
         }
+
+        /* ========= MODAL & TABS STYLES (added for model report) ========= */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.2s, opacity 0.2s;
+        }
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-container {
+            background: white;
+            border-radius: 32px;
+            max-width: 1100px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: var(--md-elevation-3);
+            animation: modalPop 0.25s ease-out;
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.96); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 28px;
+            border-bottom: 1px solid #edeaf2;
+        }
+        .modal-header h3 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #79747e;
+            transition: color 0.2s;
+        }
+        .close-modal:hover { color: #1c1b1f; }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            padding: 0 28px;
+            border-bottom: 1px solid #e9e4f2;
+            background: #fff;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 14px 20px;
+            font-weight: 600;
+            font-size: 15px;
+            color: #5f596b;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-btn.active {
+            color: var(--md-primary);
+            border-bottom-color: var(--md-primary);
+        }
+        .tab-content {
+            padding: 28px;
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .metrics-summary {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 28px;
+            background: #f8f6fc;
+            padding: 20px;
+            border-radius: 28px;
+        }
+        .metric-badge {
+            background: white;
+            border-radius: 40px;
+            padding: 8px 18px;
+            box-shadow: var(--md-elevation-1);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+            margin-top: 20px;
+        }
+        .chart-card {
+            background: #fefcff;
+            border-radius: 24px;
+            padding: 16px;
+            border: 1px solid #edeaf2;
+            box-shadow: var(--md-elevation-1);
+        }
+        .chart-card h4 {
+            margin-bottom: 16px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        canvas { max-height: 320px; width: 100%; }
+        .matrix-table-wrapper {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        .confusion-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 14px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: var(--md-elevation-1);
+        }
+        .confusion-table th, .confusion-table td {
+            border: 1px solid #e2dde9;
+            padding: 12px 10px;
+            text-align: center;
+        }
+        .confusion-table th {
+            background: #f0edf5;
+            font-weight: 600;
+        }
+        .confusion-table td {
+            background: white;
+        }
     </style>
 </head>
 <body>
@@ -555,11 +704,36 @@
     </div>
 </div>
 
+<!-- MODAL for model report with tabs -->
+<div id="reportModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3><span class="material-symbols-outlined">insights</span> Model Performance Report</h3>
+            <button class="close-modal" id="closeModalBtn">✕</button>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="curves">📈 Training Curves</button>
+            <button class="tab-btn" data-tab="matrix">📊 Confusion Matrix</button>
+        </div>
+        <div id="tabCurves" class="tab-content active">
+            <div id="metricsSummaryArea" class="metrics-summary">Loading metrics...</div>
+            <div class="chart-grid">
+                <div class="chart-card"><h4>Accuracy (Train vs Validation)</h4><canvas id="accChartCanvas"></canvas></div>
+                <div class="chart-card"><h4>Loss (Train vs Validation)</h4><canvas id="lossChartCanvas"></canvas></div>
+            </div>
+        </div>
+        <div id="tabMatrix" class="tab-content">
+            <div id="matrixContainer" class="matrix-table-wrapper">Loading confusion matrix...</div>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_BASE = 'http://localhost:8000';
     let selectedImageFile = null;
+    let accChart = null, lossChart = null;  // keep chart instances
 
-    // DOM elements
+    // DOM elements (original)
     const addClassBtn = document.getElementById('addClassBtn');
     const newClassNameInput = document.getElementById('newClassName');
     const classListContainer = document.getElementById('classListContainer');
@@ -582,6 +756,14 @@
     const checkModelHealthBtn = document.getElementById('checkModelHealthBtn');
     const globalLoader = document.getElementById('globalLoader');
     const toastMsg = document.getElementById('toastMsg');
+    const modelReportBtn = document.getElementById('modelReportBtn');
+
+    // Modal elements
+    const reportModal = document.getElementById('reportModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabCurves = document.getElementById('tabCurves');
+    const tabMatrix = document.getElementById('tabMatrix');
 
     function showToast(message, isError = false) {
         toastMsg.textContent = message;
@@ -672,7 +854,7 @@
         try {
             const data = await apiCall('/models/status');
             if (data.status === 'loaded') {
-                statModelStatusSpan.innerText = `✅ ${"Model Loaded"}`;
+                statModelStatusSpan.innerText = `✅ Model Loaded`;
                 statModelStatusSpan.style.color = '#2e7d32';
             } else {
                 statModelStatusSpan.innerText = '⭕ Not loaded';
@@ -681,6 +863,110 @@
         } catch (e) {
             statModelStatusSpan.innerText = '⚠️ Error';
         }
+    }
+
+    // NEW: render modal with tabs and detailed metrics
+    async function openModelReport() {
+        showLoading(true, 'Loading model report...');
+        try {
+            const data = await apiCall('/model-report');
+            const history = data.history;
+            const matrix = data.confusion_matrix;
+            const classNames = data.class_names || (matrix ? matrix.map((_, idx) => `Class ${idx}`) : []);
+
+            if (!history || !history.train_acc || history.train_acc.length === 0) {
+                showToast('No training history found. Please train the model first.', true);
+                showLoading(false);
+                return;
+            }
+
+            // metrics summary
+            const finalTrainAcc = history.train_acc[history.train_acc.length-1];
+            const finalValAcc = history.val_acc[history.val_acc.length-1];
+            const finalTrainLoss = history.train_loss[history.train_loss.length-1];
+            const finalValLoss = history.val_loss[history.val_loss.length-1];
+            document.getElementById('metricsSummaryArea').innerHTML = `
+                <div class="metric-badge"><strong>🎯 Final Train Acc:</strong> ${(finalTrainAcc).toFixed(2)}%</div>
+                <div class="metric-badge"><strong>✅ Final Val Acc:</strong> ${(finalValAcc).toFixed(2)}%</div>
+                <div class="metric-badge"><strong>📉 Train Loss:</strong> ${finalTrainLoss.toFixed(4)}</div>
+                <div class="metric-badge"><strong>📉 Val Loss:</strong> ${finalValLoss.toFixed(4)}</div>
+                <div class="metric-badge"><strong>📊 Number of Epochs trained on:</strong> ${history.train_acc.length}</div>
+            `;
+
+            // destroy old charts if exist
+            if (accChart) accChart.destroy();
+            if (lossChart) lossChart.destroy();
+
+            const epochs = Array.from({ length: history.train_acc.length }, (_, i) => i+1);
+            const accCtx = document.getElementById('accChartCanvas').getContext('2d');
+            accChart = new Chart(accCtx, {
+                type: 'line',
+                data: {
+                    labels: epochs,
+                    datasets: [
+                        { label: 'Training Accuracy', data: history.train_acc, borderColor: '#0b57d0', backgroundColor: 'rgba(11,87,208,0.05)', tension: 0.2, fill: true },
+                        { label: 'Validation Accuracy', data: history.val_acc, borderColor: '#2e7d32', backgroundColor: 'rgba(46,125,50,0.05)', tension: 0.2, fill: true }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${(ctx.raw*100).toFixed(2)}%` } } } }
+            });
+            const lossCtx = document.getElementById('lossChartCanvas').getContext('2d');
+            lossChart = new Chart(lossCtx, {
+                type: 'line',
+                data: {
+                    labels: epochs,
+                    datasets: [
+                        { label: 'Training Loss', data: history.train_loss, borderColor: '#d32f2f', backgroundColor: 'rgba(211,47,47,0.05)', tension: 0.2, fill: true },
+                        { label: 'Validation Loss', data: history.val_loss, borderColor: '#ff8c00', backgroundColor: 'rgba(255,140,0,0.05)', tension: 0.2, fill: true }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: true }
+            });
+
+            // render confusion matrix
+            if (matrix && matrix.length) {
+                let tableHtml = '<table class="confusion-table"><thead><tr><th>Actual \\ Predicted</th>';
+                for (let i=0; i<classNames.length; i++) tableHtml += `<th>${escapeHtml(classNames[i])}</th>`;
+                tableHtml += '</tr></thead><tbody>';
+                for (let i=0; i<matrix.length; i++) {
+                    tableHtml += `<tr><th style="background:#f0edf5;">${escapeHtml(classNames[i])}</th>`;
+                    for (let j=0; j<matrix[i].length; j++) {
+                        const val = matrix[i][j];
+                        const bgStyle = val > 0 ? 'background:#eef2ff;' : '';
+                        tableHtml += `<td style="${bgStyle} padding:10px;">${val}</td>`;
+                    }
+                    tableHtml += '</tr>';
+                }
+                tableHtml += '</tbody></table>';
+                document.getElementById('matrixContainer').innerHTML = tableHtml;
+            } else {
+                document.getElementById('matrixContainer').innerHTML = '<div class="empty-state">Confusion matrix not available yet.</div>';
+            }
+
+            // show modal
+            reportModal.classList.add('active');
+        } catch (err) {
+            showToast(err.message || 'Failed to load report', true);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // Tab switching logic
+    function initModalTabs() {
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                tabCurves.classList.remove('active');
+                tabMatrix.classList.remove('active');
+                if (targetTab === 'curves') tabCurves.classList.add('active');
+                else tabMatrix.classList.add('active');
+            });
+        });
+        closeModalBtn.addEventListener('click', () => { reportModal.classList.remove('active'); });
+        reportModal.addEventListener('click', (e) => { if (e.target === reportModal) reportModal.classList.remove('active'); });
     }
 
     async function trainModel() {
@@ -715,12 +1001,7 @@
         setTimeout(() => { clearInterval(interval); showLoading(false); }, 180000);
     }
 
-    // Upload dataset is fully blocked by lock overlay, but keep original function inert.
-    // just to avoid any errors, but no actual upload will be triggered.
-    async function uploadDatasetStub() {
-        showToast("Local dataset upload is disabled (locked feature)", true);
-    }
-    // Override event (lock overlay prevents click anyway)
+    // Upload dataset is fully blocked by lock overlay
     if(uploadDatasetBtn) uploadDatasetBtn.addEventListener('click', (e) => { e.preventDefault(); showToast("Local dataset uploads are disabled", true); });
     if(datasetFilesInput) datasetFilesInput.disabled = true;
 
@@ -806,17 +1087,7 @@
         } catch(e) { showToast('Cannot fetch model status', true); }
     }
 
-    document.getElementById("modelReportBtn").onclick = async () => {
-        try {
-            const data = await apiCall("/models/report");
-            console.log("Model Report:", data);
-            alert("Report logged in console (training metrics)");
-        } catch(e) {
-            showToast("Report endpoint not implemented yet", true);
-        }
-    };
-
-    // Event listeners
+    // Event listeners (preserve all original)
     addClassBtn.addEventListener('click', addClass);
     refreshClassesBtn.addEventListener('click', loadClasses);
     trainModelBtn.addEventListener('click', trainModel);
@@ -824,12 +1095,8 @@
     checkModelHealthBtn.addEventListener('click', modelHealth);
     classifyBtn.addEventListener('click', classifyImage);
     clearResultsBtn.addEventListener('click', clearResults);
-
-    // drag & drop classification
     dragDropZone.addEventListener('click', () => classifyFileInput.click());
-    classifyFileInput.addEventListener('change', (e) => {
-        if (e.target.files.length) handleFileSelect(e.target.files[0]);
-    });
+    classifyFileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFileSelect(e.target.files[0]); });
     dragDropZone.addEventListener('dragover', (e) => { e.preventDefault(); dragDropZone.style.borderColor = '#0b57d0'; });
     dragDropZone.addEventListener('dragleave', () => { dragDropZone.style.borderColor = '#cac4d0'; });
     dragDropZone.addEventListener('drop', (e) => {
@@ -839,6 +1106,10 @@
         if (file && file.type.startsWith('image/')) handleFileSelect(file);
         else showToast('Only image files allowed', true);
     });
+
+    // New model report button handler
+    modelReportBtn.addEventListener('click', openModelReport);
+    initModalTabs();
 
     function escapeHtml(str) { return String(str).replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 

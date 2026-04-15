@@ -75,7 +75,7 @@ class Trainer:
 
         best_acc = 0
 
-        for epoch in range(2):
+        for epoch in range(10):
             self.model.train()
             total_loss, correct, total = 0, 0, 0
 

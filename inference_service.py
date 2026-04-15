@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 import torch
@@ -279,3 +281,15 @@ async def reload_model():
     if ok:
         return {"message": "Model reloaded successfully"}
     return {"message": "No model found"}
+
+@app.get("/model-report")
+async def get_model_report():
+    report_path = Path("data/models/report.json")
+
+    if not report_path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    with open(report_path) as f:
+        data = json.load(f)
+
+    return data
